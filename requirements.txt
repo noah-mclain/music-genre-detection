@@ -10,3 +10,24 @@ scikit-learn>=1.3.0
 Pillow>=10.0.0
 soundfile>=0.12.0
 kaggle>=1.5.0
+
+# UI
+Flask>=2.3.0
+Flask-CORS>=3.0.0
+python-dotenv>=1.0.0
+
+# Code Quality & Testing
+black>=23.9.0
+pytest>=7.4.0
+pylint>=2.17.0
+isort>=5.11.4
+mypy>=1.5.1
+pytest-cov>=4.1.0
+
+# Documentation
+sphinx>=7.2.0
+sphinx-rtd-theme>=1.2.0
+
+# Expxlainable AI
+shap>=0.42.0
+lime>=0.2.0.1
