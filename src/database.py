@@ -11,13 +11,13 @@ logger = logging.getLogger(__name__)
 
 class GTZANDataset(Dataset):
     def __init__(self, data_dir: str, sample_rate: int = 22050, 
-                 n_mels: int = 128, n_fft: int = 2048, hop_lenght: int = 512, 
+                 n_mels: int = 128, n_fft: int = 2048, hop_length: int = 512, 
                  duration: float = 30.0, segment_length: int = 130, augement: bool = True, cache_spectograms: bool = False):
         self.data_dir = Path(data_dir)
         self.sample_rate = sample_rate
         self.n_mels = n_mels
         self.n_fft = n_fft
-        self.hop_length = hop_lenght
+        self.hop_length = hop_length
         self.duration = duration
         self.segment_length = segment_length
         self.augement = augement
@@ -49,3 +49,40 @@ class GTZANDataset(Dataset):
             self.spec_cache = {}
         else:
             self.spec_cache = None
+
+    def __getitem__(self, index):
+        try:
+            if self.cache_spectograms and index in self.spec_cache:
+                spectogram_log_scale = self.spec_cache[index]
+            
+            else:
+                y_audio, sr = librosa.load(self.audio_files[index], duration=self.duration, sr=self.sample_rate, mono=True)  
+                # mfccs = librosa.feature.mfcc(y=y_audio, sr=sr, n_mfcc=20)
+                spectogram = librosa.feature.melspectrogram(y=y_audio,
+                                                            sr=sr,
+                                                            n_mels=self.n_mels,
+                                                            n_fft=self.n_fft,
+                                                            hop_length=self.hop_length)
+
+
+                spectogram_log_scale = librosa.power_to_db(spectogram, ref=np.max)
+
+                # time_size = spectogram_log_scale.shape[1]
+                # max_width = int((self.sample_rate * self.duration) / self.hop_length) + 1
+
+                # if time_size < max_width:
+                #     spectogram_log_scale = np.pad(spectogram_log_scale, [(0, 0), (0, max_width - time_size)], mode="constant")
+
+                # else:
+                #     spectogram_log_scale = spectogram_log_scale[:, :max_width]
+
+                if self.cache_spectograms:
+                    self.spec_cache[index] = spectogram_log_scale
+
+            mfcc_tensor = torch.Tensor(spectogram_log_scale, dtype=torch.float32).unsqueeze(0)
+            label_tensor = torch.tensor(self.labels[index], dtype=torch.long)
+
+            return mfcc_tensor, label_tensor
+
+        except:
+            raise IndexError

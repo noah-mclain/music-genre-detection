@@ -53,7 +53,7 @@ class CNNLSTMAttentionModel(nn.Module):
         self.hidden_dim = hidden_dim
         self.num_lstm_layers = num_lstm_layers
         self.dropout_rate = dropout
-
+        
         self.cnn = nn.Sequential(
             # Block 1
             nn.Conv2d(1, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
