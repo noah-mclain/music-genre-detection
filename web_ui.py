@@ -2,10 +2,12 @@ from flask import Flask, request, render_template
 import torch
 import librosa
 import numpy as np
+import os
 from src.inference_utils import GenreClassifier
 
+
 class WebUI:
-    def __init__ (self, model_path, genres, host = "127.0.0.1", port = 8080):
+    def __init__(self, model_path, genres, host="127.0.0.1", port=8080):
         self.app = Flask(__name__)
         self.model = GenreClassifier(model_path, genres)
 
@@ -19,27 +21,27 @@ class WebUI:
         y, sr = librosa.load(file_path, sr=22050, duration=duration)
         mfcc = librosa.feature.mfcc(y=y, sr=sr, n_mfcc=n_mfcc)
         if mfcc.shape[1] < max_len:
-            mfcc.shape = np.pad(mfcc, ((0,0) , (0,max_len - mfcc.shape[1])), mode='constant')
+            mfcc.shape = np.pad(
+                mfcc, ((0, 0), (0, max_len - mfcc.shape[1])), mode="constant"
+            )
         else:
             mfcc = mfcc[:, :max_len]
         mfcc = torch.tensor(mfcc, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
-    
+
     def index(self):
         if request.method == "POST":
             if "audio_file" not in request.files:
                 return "No file uploaded"
-            
+
             file = request.files["audio_file"]
             file_path = f"temp_{file.filename}"
             file.save(file_path)
 
             pred_genre = self.model.predict(file_path)
+            os.remove(file_path)
 
             return render_template("index.html", genre=pred_genre)
         return render_template("index.html", genre=None)
-    
+
     def run(self):
         self.app.run(host=self.host, port=self.port, debug=True)
-
-
-    
