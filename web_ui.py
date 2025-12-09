@@ -2,11 +2,13 @@ from flask import Flask, request, render_template
 import torch
 import librosa
 import numpy as np
+from src.inference_utils import GenreClassifier
 
 class WebUI:
     def __init__ (self, model_path, genres, host = "127.0.0.1", port = 8080):
         self.app = Flask(__name__)
-        self.model = torch.load(model_path)
+        self.model = GenreClassifier(model_path, genres)
+
         self.model.eval()
         self.genres = genres
         self.host = host
@@ -26,14 +28,12 @@ class WebUI:
         if request.method == "POST":
             if "audio_file" not in request.files:
                 return "No file uploaded"
+            
             file = request.files["audio_file"]
             file_path = f"temp_{file.filename}"
+            file.save(file_path)
 
-            mfcc_tensor = self.extract_mfcc(file_path)
-            with torch.no_grad():
-                output = self.model(mfcc_tensor)
-                pred_idx = torch.argmax(output, dim=1).item()
-                pred_genre = self.genres[pred_idx]
+            pred_genre = self.model.predict(file_path)
 
             return render_template("index.html", genre=pred_genre)
         return render_template("index.html", genre=None)

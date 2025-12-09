@@ -12,13 +12,13 @@ class TemporalAttention(nn.Module):
         assert hidden_dim % num_heads == 0, "hidden_dim must be divisible by num_heads"
 
         self.query = nn.Linear(hidden_dim, hidden_dim)
-        self.key = nn.Lineaer(hidden_dim, hidden_dim)
+        self.key = nn.Linear(hidden_dim, hidden_dim)
         self.value = nn.Linear(hidden_dim, hidden_dim)
 
         self.fc_out = nn.Linear(hidden_dim, hidden_dim)
         self.scale = self.head_dim ** -0.5
 
-    def foward(self, lstm_output: torch.Tensor) -> tuple:
+    def forward(self, lstm_output: torch.Tensor) -> tuple:
         batch_size = lstm_output.shape[0]
         seq_len = lstm_output.shape[1]
 
@@ -46,7 +46,7 @@ class TemporalAttention(nn.Module):
         return context, attention_weights
         
 class CNNLSTMAttentionModel(nn.Module):
-    def __init__(self, num_genres: int = 10, num_lstm_layers:int = 2, hidden_dim: int = 128, num_attention_heads: int = 4, dropout: int = 0.5):
+    def __init__(self, num_genres: int = 10, num_lstm_layers:int = 2, hidden_dim: int = 128, num_attention_heads: int = 4, dropout: float = 0.5):
         super(CNNLSTMAttentionModel, self).__init__()
 
         self.num_genres = num_genres
@@ -98,7 +98,7 @@ class CNNLSTMAttentionModel(nn.Module):
 
         lstm_output_dim = hidden_dim * 2 # bidirectional
 
-        self.attention = TemporalAttention(hidden_dim-lstm_output_dim, num_heads=num_attention_heads)
+        self.attention = TemporalAttention(lstm_output_dim, num_heads=num_attention_heads)
 
         # Classification layer
         self.classifier = nn.Sequential(
@@ -110,7 +110,7 @@ class CNNLSTMAttentionModel(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(hidden_dim // 2, num_genres)
         )
-    def foward(self, x: torch.Tensor, return_attention: bool = False) -> Union[Tuple, torch.Tensor]:
+    def forward(self, x: torch.Tensor, return_attention: bool = False) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
         batch_size = x.size(0)
 
         # CNN feature extraction

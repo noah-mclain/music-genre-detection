@@ -3,6 +3,49 @@ import os
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+import torch
+
+
+class GenreClassifier:
+    def __init__(self, model_path, genre_mapping, 
+                 sample_rate=22050, n_mels=128, n_fft=2048, hop_length=512, duration=30.0):
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.model = torch.load(model_path, map_location=self.device)
+        self.model.eval()
+
+        self.genre_mapping = genre_mapping
+        self.sample_rate = sample_rate
+        self.n_mels = n_mels
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.duration = duration
+
+        self.max_width = int((sample_rate * duration) / hop_length) + 1
+    
+    def preprocess_audio(self, file_path):
+        ... 
+
+    def predict(self, file_path):
+        x = self.preprocess_audio(file_path)
+
+        with torch.no_grad():
+            logits = self.model(x)
+            pred_idx = torch.argmax(logits, dim=1).item()
+
+        return self.genre_mapping[pred_idx]
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def audio_generator(data_path, genres, batch_size=32, test_size=0.2, random_state=42):
     all_files = []
