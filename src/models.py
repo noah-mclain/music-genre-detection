@@ -116,21 +116,21 @@ class CNNLSTMAttentionModel(nn.Module):
         )
         
         # Classification layer
-        self.classifier = nn.Sequential(
-            nn.Linear(lstm_output_dim, hidden_dim),
-            nn.LeakyReLU(0.1, inplace=True),
-            # nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.LeakyReLU(0.1, inplace=True),
-            nn.Dropout(dropout),
-            nn.Linear(hidden_dim // 2, num_genres),
-        )
-
-        # self.final_classifier = nn.Sequential(
+        # self.classifier = nn.Sequential(
+        #     nn.Linear(lstm_output_dim, hidden_dim),
+        #     nn.LeakyReLU(0.1, inplace=True),
+        #     # nn.Dropout(dropout),
+        #     nn.Linear(hidden_dim, hidden_dim // 2),
         #     nn.LeakyReLU(0.1, inplace=True),
         #     nn.Dropout(dropout),
-        #     nn.Linear(lstm_output_dim, num_genres),
+        #     nn.Linear(hidden_dim // 2, num_genres),
         # )
+
+        self.classifier = nn.Sequential(
+            nn.LeakyReLU(0.1, inplace=True),
+            nn.Dropout(dropout),
+            nn.Linear(lstm_output_dim, num_genres),
+        )
 
     def forward(
         self, x: torch.Tensor, return_attention: bool = False

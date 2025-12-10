@@ -35,6 +35,8 @@ def main():
 
     # Initialize model, loss, and optimizer
     model = CNNLSTMAttentionModel(num_genres=num_classes)
+    model.load_state_dict(torch.load("cnn_lstm_attention.pth", weights_only=True))
+
     #model = SimpleModel(num_genres=num_classes)
     model.to(device)
 

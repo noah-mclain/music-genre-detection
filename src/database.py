@@ -77,6 +77,10 @@ class GTZANDataset(Dataset):
             label = self.labels[index]
 
             mel_spectrogram = self._extract_mel_spectrogram(audio_path)
+
+            if self.augment:
+                mel_spectrogram = self._augment_spectrogram(mel_spectrogram)
+                
             spec_tensor = torch.FloatTensor(mel_spectrogram).unsqueeze(0)
 
             label_tensor = torch.tensor(label, dtype=torch.long)
