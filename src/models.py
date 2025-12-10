@@ -33,7 +33,8 @@ class TemporalAttention(nn.Module):
         # shape: (batch_size, num_heads, seq_len, head_dim)
 
         scores = (
-            torch.matmul(Q, K.transpose(-2, 1)) * self.scale
+            # torch.matmul(Q, K.transpose(-2, 1)) * self.scale
+            torch.matmul(Q, K.transpose(-1, -2)) * self.scale
         )  # (batch_size, num_heads, seq_len, seq_len)
         attention_weights = torch.softmax(scores, dim=-1)
 
@@ -58,7 +59,7 @@ class CNNLSTMAttentionModel(nn.Module):
         num_lstm_layers: int = 2,
         hidden_dim: int = 128,
         num_attention_heads: int = 4,
-        dropout: float = 0.5,
+        dropout: float = 0.2,
     ):
         super(CNNLSTMAttentionModel, self).__init__()
 
@@ -73,25 +74,25 @@ class CNNLSTMAttentionModel(nn.Module):
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
-            nn.Dropout2d(dropout),
+            # nn.Dropout2d(dropout),
             # Block 2
             nn.Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
-            nn.Dropout2d(dropout),
+            # nn.Dropout2d(dropout),
             # Block 3
             nn.Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.BatchNorm2d(128),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
-            nn.Dropout2d(dropout),
+            # nn.Dropout2d(dropout),
             # Block 4
             nn.Conv2d(128, 256, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
-            nn.Dropout2d(dropout),
+            # nn.Dropout2d(dropout),
         )
 
         self.cnn_output_dim = (
@@ -113,17 +114,23 @@ class CNNLSTMAttentionModel(nn.Module):
         self.attention = TemporalAttention(
             lstm_output_dim, num_heads=num_attention_heads
         )
-
+        
         # Classification layer
         self.classifier = nn.Sequential(
             nn.Linear(lstm_output_dim, hidden_dim),
-            nn.ReLU(inplace=True),
-            nn.Dropout(dropout),
+            nn.LeakyReLU(0.1, inplace=True),
+            # nn.Dropout(dropout),
             nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.ReLU(inplace=True),
+            nn.LeakyReLU(0.1, inplace=True),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim // 2, num_genres),
         )
+
+        # self.final_classifier = nn.Sequential(
+        #     nn.LeakyReLU(0.1, inplace=True),
+        #     nn.Dropout(dropout),
+        #     nn.Linear(lstm_output_dim, num_genres),
+        # )
 
     def forward(
         self, x: torch.Tensor, return_attention: bool = False
@@ -137,12 +144,12 @@ class CNNLSTMAttentionModel(nn.Module):
         cnn_out = cnn_out.view(batch_size, -1, self.cnn_output_dim)
         lstm_out, _ = self.lstm(cnn_out)  # (batch_size, seq_len, hidden_dim * 2)
 
-        # Attention mechanism
+        # # Attention mechanism
         context, attention_weights = self.attention(
             lstm_out
         )  # (batch_size, hidden_dim * 2)
 
-        # Classification
+        # # Classification
         logits = self.classifier(context)  # (batch_size, num_genres)
 
         if return_attention:
@@ -161,3 +168,63 @@ class CNNLSTMAttentionModel(nn.Module):
             "lstm_layers": self.num_lstm_layers,
             "dropout_rate": self.dropout_rate,
         }
+    
+class SimpleModel(nn.Module):
+    def __init__(
+    self,
+    num_genres: int = 10,
+    num_lstm_layers: int = 2,
+    hidden_dim: int = 128,
+    num_attention_heads: int = 4,
+    dropout: float = 0.5,
+    ):
+        super(SimpleModel, self).__init__()
+
+        self.num_genres = num_genres
+        self.hidden_dim = hidden_dim
+        self.num_lstm_layers = num_lstm_layers
+        self.dropout_rate = dropout
+        
+        self.layer1 = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.BatchNorm2d(16),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
+        )
+
+        self.layer2 = nn.Sequential(
+            nn.Conv2d(16, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
+        )
+
+        self.layer3 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
+        )
+
+        self.layer4 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
+        )
+
+        self.global_pooling = nn.AdaptiveAvgPool2d((1, 1))
+
+        self.flatten = nn.Flatten()
+        self.fc = nn.Linear(128, num_genres)
+
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        out = self.layer1(x)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        out = self.global_pooling(out)
+        out = self.flatten(out)
+        out = self.fc(out)
+        return out

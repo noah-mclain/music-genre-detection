@@ -1,17 +1,16 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, random_split
 from database import GTZANDataset
-from models import CNNLSTMAttentionModel
-
+from models import CNNLSTMAttentionModel, SimpleModel
 
 def main():
     # Hyperparameters
-    data_dir = ""
+    data_dir = "E:\Deep Learning\music-genre-detection\Data\genres_original"
     batch_size = 8
-    num_epochs = 4
-    learning_rate = 1e-3
+    num_epochs = 20
+    learning_rate = 1e-5
     if torch.cuda.is_available():
         device = torch.device("cuda")
     elif torch.backends.mps.is_available():
@@ -21,16 +20,22 @@ def main():
     n_mels = 128
 
     # prepare Dataset and Dataloaders
-    train_dataset = GTZANDataset(f"{data_dir}/train", n_mels=n_mels)
-    val_dataset = GTZANDataset(f"{data_dir}/val", n_mels=n_mels)
+    dataset = GTZANDataset(f"{data_dir}", n_mels=n_mels)
+    print(len(dataset))
+    train_size = int(len(dataset) * 0.8)
+    val_size = len(dataset) - train_size
+    train_dataset, val_dataset = random_split(dataset, [train_size, val_size], torch.Generator().manual_seed(42))
+
+    #val_dataset = GTZANDataset(f"{data_dir}/val", n_mels=n_mels)
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-    num_classes = len(train_dataset.genres)
+    num_classes = len(dataset.genres)
 
     # Initialize model, loss, and optimizer
     model = CNNLSTMAttentionModel(num_genres=num_classes)
+    #model = SimpleModel(num_genres=num_classes)
     model.to(device)
 
     criterion = nn.CrossEntropyLoss()

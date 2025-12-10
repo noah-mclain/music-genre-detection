@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Tuple, List, Optional
 import logging
 
-from src.inference_utils import AudioProcessor
+from inference_utils import AudioProcessor
 
 logger = logging.getLogger(__name__)
 
