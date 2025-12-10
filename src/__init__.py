@@ -10,6 +10,8 @@ from .inference_utils import (
     audio_generator,
 )
 
+from .mock_classifier import MockGenreClassifier
+
 from .models import TemporalAttention, CNNLSTMAttentionModel
 
 from .database import GTZANDataset
@@ -20,6 +22,8 @@ __all__ = [
     "AudioAugmentation",
     "GenreClassifier",
     "audio_generator",
+    # Mock Classifier
+    "MockGenreClassifier",
     # Model Components
     "TemporalAttention",
     "CNNLSTMAttentionModel",
