@@ -32,3 +32,4 @@ sphinx-rtd-theme>=1.2.0
 # Expxlainable AI
 shap>=0.42.0
 lime>=0.2.0.1
+opencv-python>=4.8.1.78
