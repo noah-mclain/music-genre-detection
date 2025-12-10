@@ -1,19 +1,119 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <link rel="stylesheet" href="styles.css">
-        <title> Music Genre Classifier</title>
-    </head>
-    <body>
-        <h1> Upload a song to classify its genre </h1>
-        <form method="post" enctype="multipart/form-data">
-            <input type="file" name="audio_file" accept=".wav,.mp3" required>
-            <button type="submit">Predict Genre</button>
-        </form>
-        
-        {% if genre %}
-            <h2> Predicted Genre: {{genre}} </h2>
-        {% endif %}
-    </body>
-    </html>
-    
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Genre Classifier - Music Genre Detection</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <header class="header">
+        <div class="header-content">
+          <h1>Genre Classifier</h1>
+          <p>Discover the music genre using advanced AI classification</p>
+        </div>
+      </header>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Upload Section -->
+        <section class="upload-section">
+          <div class="upload-box" id="uploadBox">
+            <svg
+              class="upload-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="17 8 12 3 7 8"></polyline>
+              <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+            <h2>Drop Your Music Here</h2>
+            <p>MP3, WAV, M4A, FLAC supported • Up to 50MB</p>
+            <input
+              type="file"
+              id="fileInput"
+              multiple
+              accept=".mp3,.wav,.m4a,.flac"
+              style="display: none"
+            />
+          </div>
+
+          <!-- File List -->
+          <div id="fileList" class="file-list" style="display: none">
+            <h3>Selected Files</h3>
+            <ul id="selectedFiles"></ul>
+          </div>
+
+          <!-- Buttons -->
+          <div class="button-group">
+            <button id="selectBtn" class="btn btn-primary">
+              Select Music Files
+            </button>
+            <button
+              id="clearBtn"
+              class="btn btn-secondary"
+              style="display: none"
+            >
+              Clear All
+            </button>
+            <button
+              id="analyzeBtn"
+              class="btn btn-success"
+              style="display: none"
+              disabled
+            >
+              Analyze Files
+            </button>
+          </div>
+        </section>
+
+        <!-- Progress Section -->
+        <section
+          id="progressSection"
+          class="progress-section"
+          style="display: none"
+        >
+          <h3>Analyzing Your Music...</h3>
+          <div class="progress-bar">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+          <p id="progressText">Initializing analysis...</p>
+        </section>
+
+        <!-- Results Section -->
+        <section
+          id="resultsSection"
+          class="results-section"
+          style="display: none"
+        >
+          <h2>Genre Analysis Results</h2>
+          <div id="resultsContainer" class="results-container"></div>
+        </section>
+
+        <!-- Error Section -->
+        <section id="errorSection" class="error-section" style="display: none">
+          <div class="alert alert-error">
+            <h3>Error</h3>
+            <p id="errorText"></p>
+          </div>
+        </section>
+      </main>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <p>Advanced Music Genre Classification using CNN-LSTM-Attention</p>
+        <p>Authors: Omar Khaled, Nada Ayman • Version 1.0</p>
+      </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+  </body>
+</html>
