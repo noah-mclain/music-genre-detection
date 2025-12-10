@@ -216,3 +216,4 @@ results/
 *.pkl
 .qodo/
 .DS_Store
+uploaded_files/
