@@ -1,0 +1,111 @@
+name: CI - Code Quality & Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10", "3.11"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install black pylint mypy isort pytest pytest-cov sphinx sphinx-rtd-theme
+
+      - name: Format check with Black
+        run: black . --check --verbose
+        continue-on-error: true
+
+      - name: Import sort check with isort
+        run: isort . --check-only --verbose
+        continue-on-error: true
+
+      - name: Lint with pylint
+        run: pylint *.py --exit-zero --output-format=json > pylint_report.json || true
+
+      - name: Type check with mypy
+        run: mypy . --ignore-missing-imports --no-error-summary
+        continue-on-error: true
+
+      - name: Run tests with pytest
+        run: |
+          pytest -v --cov=. --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v3
+        with:
+          name: code-coverage-report-${{ matrix.python-version }}
+          path: htmlcov/
+
+      - name: Archive pylint results
+        uses: actions/upload-artifact@v3
+        with:
+          name: pylint-report-${{ matrix.python-version }}
+          path: pylint_report.json
+        continue-on-error: true
+
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.9"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install sphinx sphinx-rtd-theme
+
+      - name: Build documentation
+        run: |
+          cd docs
+          sphinx-apidoc -o . .. -f
+          make clean
+          make html
+        continue-on-error: true
+
+      - name: Upload documentation
+        uses: actions/upload-artifact@v3
+        with:
+          name: sphinx-documentation
+          path: docs/_build/html/
+        continue-on-error: true

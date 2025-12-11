@@ -1,8 +1,10 @@
-from flask import Flask, request, render_template
-import torch
+import os
+
 import librosa
 import numpy as np
-import os
+import torch
+from flask import Flask, render_template, request
+
 from src.inference_utils import GenreClassifier
 
 

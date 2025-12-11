@@ -57,6 +57,7 @@ function handleDrop(e) {
   addFiles(files);
 }
 
+// TODO: handle multiple files during different uploads
 // Handle file select
 function handleFileSelect(e) {
   const files = Array.from(e.target.files);
@@ -239,7 +240,7 @@ function renderPredictions(predictions) {
   if (!predictions || Object.keys(predictions).length === 0) {
     return "";
   }
-
+  // TODO: have it order by top most confident rather than just split at 5
   const entries = Object.entries(predictions).slice(0, 5); // Top 5
   const html = entries
     .map(

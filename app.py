@@ -1,20 +1,19 @@
-from flask import Flask, request, render_template, jsonify, send_from_directory
+import logging
+import os
+from datetime import datetime
+from pathlib import Path
+
+import torch
+from flask import Flask, jsonify, render_template, request
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-import torch
-import librosa
-import numpy as np
-import os
-from pathlib import Path
-from datetime import datetime
-import logging
 
 USE_MOCK = os.getenv("USE_MOCK", "false").lower() == "true"
 
 if USE_MOCK:
     from src.mock_classifier import MockGenreClassifier as GenreClassifier
 else:
-    from src.inference_utils import GenreClassifier, AudioProcessor
+    from src.inference_utils import AudioProcessor, GenreClassifier
 
 
 class Config:
@@ -88,9 +87,7 @@ class MusicGenreClassifierApp:
                 duration=self.config.DURATION,
                 segment_length=self.config.SEGMENT_LENGTH,
             )
-            logger.info(
-                f"✅ Model loaded successfully on device: {self.classifier.device}"
-            )
+            logger.info(f"✅ Model loaded successfully on device: {self.classifier.device}")
         except Exception as e:
             logger.error(f"❌ Failed to load model: {e}")
             raise e
@@ -102,9 +99,7 @@ class MusicGenreClassifierApp:
         self.app.add_url_rule("/", "index", self.index, methods=["GET"])
         self.app.add_url_rule("/upload", "upload", self.upload, methods=["POST"])
         self.app.add_url_rule("/health", "health", self.health, methods=["GET"])
-        self.app.add_url_rule(
-            "/api/genres", "get_genres", self.get_genres, methods=["GET"]
-        )
+        self.app.add_url_rule("/api/genres", "get_genres", self.get_genres, methods=["GET"])
         self.app.add_url_rule("/predict", "predict", self.predict, methods=["POST"])
 
     def index(self):
@@ -152,9 +147,7 @@ class MusicGenreClassifierApp:
 
             if not self._is_valid_audio_file(file.filename):
                 return (
-                    jsonify(
-                        {"error": "Invalid file format. Supported: MP3, WAV, M4A, FLAC"}
-                    ),
+                    jsonify({"error": "Invalid file format. Supported: MP3, WAV, M4A, FLAC"}),
                     400,
                 )
 
@@ -181,11 +174,7 @@ class MusicGenreClassifierApp:
                 )
 
                 # Convert to tensor
-                x = (
-                    torch.tensor(mel_spec, dtype=torch.float32)
-                    .unsqueeze(0)
-                    .unsqueeze(0)
-                )
+                x = torch.tensor(mel_spec, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
                 x = x.to(self.classifier.device)
 
                 # Get predictions
@@ -254,89 +243,82 @@ class MusicGenreClassifierApp:
                         )
                         continue
 
-                    filepath = os.path.join(
-                        self.config.UPLOAD_FOLDER, filename
-                    )
+                    filepath = os.path.join(self.config.UPLOAD_FOLDER, filename)
                     file.save(filepath)
 
                     try:
                         # ============================================
-                        # MOCK VERSION (Currently Active)
+                        # MOCK VERSION
+                        # ============================================
+                        # logger.info(f"Processing file: {filename}")
+                        # genre, confidence, predictions = self.classifier.predict(
+                        #     filepath
+                        # )
+                        # # Sort by confidence
+                        # sorted_predictions = dict(
+                        #     sorted(
+                        #         predictions.items(), key=lambda x: x[1], reverse=True
+                        #     )
+                        # )
+
+                        # results.append(
+                        #     {
+                        #         "filename": filename,
+                        #         "success": True,
+                        #         "genre": genre,
+                        #         "confidence": float(confidence),
+                        #         "predictions": sorted_predictions,
+                        #     }
+                        # )
+                        # logger.info(f"✅ {filename}: {genre}")
+
+                        # ============================================
+                        # PRODUCTION VERSION
                         # ============================================
                         logger.info(f"Processing file: {filename}")
-                        genre, confidence, predictions = self.classifier.predict(
-                            filepath
-                            )
+
+                        # Extract mel-spectrogram
+                        mel_spec = AudioProcessor.extract_mel_spectrogram(
+                            filepath,
+                            sr=self.config.SAMPLE_RATE,
+                            n_mels=self.config.N_MELS,
+                            n_fft=self.config.N_FFT,
+                            hop_length=self.config.HOP_LENGTH,
+                            duration=self.config.DURATION,
+                            segment_length=self.config.SEGMENT_LENGTH,
+                        )
+
+                        # Convert to tensor
+                        x = torch.tensor(mel_spec, dtype=torch.float32).unsqueeze(0).unsqueeze(0)
+                        x = x.to(self.classifier.device)
+
+                        # Get predictions
+                        with torch.no_grad():
+                            logits = self.classifier.model(x)
+                            probabilities = torch.softmax(logits, dim=1)
+                            pred_idx = torch.argmax(probabilities, dim=1).item()
+                            confidence = probabilities[0, pred_idx].item() * 100
+
+                        # Get all predictions
+                        all_predictions = {}
+                        for idx, genre in self.config.GENRE_MAPPING.items():
+                            all_predictions[genre] = float(probabilities[0, idx].item())
+
                         # Sort by confidence
                         sorted_predictions = dict(
-                            sorted(
-                                predictions.items(), key=lambda x: x[1], reverse=True
-                            )
+                            sorted(all_predictions.items(), key=lambda x: x[1], reverse=True)
                         )
 
                         results.append(
                             {
                                 "filename": filename,
                                 "success": True,
-                                "genre": genre,
-                                "confidence": float(confidence),
+                                "genre": self.config.GENRE_MAPPING[pred_idx],
+                                "confidence": confidence,
                                 "predictions": sorted_predictions,
                             }
                         )
-                        logger.info(f"✅ {filename}: {genre}")
-
-                        # ============================================
-                        # PRODUCTION VERSION (Commented - Uncomment Later)
-                        # ============================================
-                        # Uncomment this when you have trained model
-                        # and comment out MOCK VERSION above
-                        #
-                        # logger.info(f"Processing file: {filename}")
-                        #
-                        # # Extract mel-spectrogram
-                        # mel_spec = AudioProcessor.extract_mel_spectrogram(
-                        #     filepath,
-                        #     sr=self.config.SAMPLE_RATE,
-                        #     n_mels=self.config.N_MELS,
-                        #     n_fft=self.config.N_FFT,
-                        #     hop_length=self.config.HOP_LENGTH,
-                        #     duration=self.config.DURATION,
-                        #     segment_length=self.config.SEGMENT_LENGTH,
-                        # )
-                        #
-                        # # Convert to tensor
-                        # x = (
-                        #     torch.tensor(mel_spec, dtype=torch.float32)
-                        #     .unsqueeze(0)
-                        #     .unsqueeze(0)
-                        # )
-                        # x = x.to(self.classifier.device)
-                        #
-                        # # Get predictions
-                        # with torch.no_grad():
-                        #     logits = self.classifier.model(x)
-                        #     probabilities = torch.softmax(logits, dim=1)
-                        #     pred_idx = torch.argmax(probabilities, dim=1).item()
-                        #     confidence = probabilities[0, pred_idx].item() * 100
-                        #
-                        # # Get all predictions
-                        # all_predictions = {}
-                        # for idx, genre in self.config.GENRE_MAPPING.items():
-                        #     all_predictions[genre] = float(probabilities[0, idx].item())
-                        #
-                        # # Sort by confidence
-                        # sorted_predictions = dict(
-                        #     sorted(all_predictions.items(), key=lambda x: x[1], reverse=True)
-                        # )
-                        #
-                        # results.append({
-                        #     "filename": filename,
-                        #     "success": True,
-                        #     "genre": self.config.GENRE_MAPPING[pred_idx],
-                        #     "confidence": confidence,
-                        #     "predictions": sorted_predictions,
-                        # })
-                        # logger.info(f"✅ {filename}: {self.config.GENRE_MAPPING[pred_idx]}")
+                        logger.info(f"✅ {filename}: {self.config.GENRE_MAPPING[pred_idx]}")
 
                     except Exception as e:
                         logger.error(f"Error processing {filename}: {e}")
@@ -362,9 +344,7 @@ class MusicGenreClassifierApp:
         return ext in self.config.SUPPORTED_FORMATS
 
     def run(self):
-        logger.info(
-            f"🎵 Starting Genre Classifier on {self.config.HOST}:{self.config.PORT}"
-        )
+        logger.info(f"🎵 Starting Genre Classifier on {self.config.HOST}:{self.config.PORT}")
         self.app.run(
             host=self.config.HOST,
             port=self.config.PORT,

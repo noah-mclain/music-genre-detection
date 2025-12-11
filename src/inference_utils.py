@@ -1,10 +1,13 @@
-import librosa
+import logging
 import os
+
+import librosa
 import numpy as np
+import torch
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-import torch
-import logging
+
+from src.models import CNNLSTMAttentionModel
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +149,10 @@ class GenreClassifier:
         segment_length: int = 130,
     ):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = torch.load(model_path, map_location=self.device)
+        self.model = CNNLSTMAttentionModel(num_genres=len(genre_mapping))
+        state_dict = torch.load(model_path, map_location=self.device)
+        self.model.load_state_dict(state_dict)
+        self.model.to(self.device)
         self.model.eval()
 
         self.genre_mapping = genre_mapping

@@ -218,3 +218,5 @@ results/
 .qodo/
 .DS_Store
 uploaded_files/
+docs/_build/
+docs/.doctrees/

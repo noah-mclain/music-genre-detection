@@ -1,8 +1,13 @@
-import pytest
+import sys
+from pathlib import Path
+
 import numpy as np
+import pytest
 import torch
 
-from src.inference_utils import AudioProcessor, AudioAugmentation
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.inference_utils import AudioAugmentation, AudioProcessor
 
 
 class TestAudioProcessor:
@@ -13,16 +18,12 @@ class TestAudioProcessor:
         assert tensor.shape == (1, 1, 128, 130)  # (batch, channel, n_mels, seg_len)
 
     def test_to_tensor_no_channel(self, sample_mel_spec: np.ndarray) -> None:
-        tensor = AudioProcessor.to_tensor(
-            sample_mel_spec, add_channel=False, add_batch=True
-        )
+        tensor = AudioProcessor.to_tensor(sample_mel_spec, add_channel=False, add_batch=True)
 
         assert tensor.shape == (128, 130)
 
     def test_to_tensor_no_batch(self, sample_mel_spec: np.ndarray) -> None:
-        tensor = AudioProcessor.to_tensor(
-            sample_mel_spec, add_channel=True, add_batch=False
-        )
+        tensor = AudioProcessor.to_tensor(sample_mel_spec, add_channel=True, add_batch=False)
 
         assert tensor.shape == (1, 128, 130)
 
@@ -37,9 +38,7 @@ class TestAudioProcessor:
 
         assert tensor.device.type == "cuda"
 
-    @pytest.mark.skipif(
-        not torch.backends.mps.is_available(), reason="MPS is not available"
-    )
+    @pytest.mark.skipif(not torch.backends.mps.is_available(), reason="MPS is not available")
     def test_to_tensor_device_mps(self, sample_mel_spec: np.ndarray) -> None:
         tensor = AudioProcessor.to_tensor(sample_mel_spec, device="mps")
 

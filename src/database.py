@@ -1,13 +1,14 @@
+import logging
+import os
+import pickle
+from pathlib import Path
+from typing import Dict, List, Tuple
+
+import numpy as np
 import torch
 from torch.utils.data import Dataset
-import numpy as np
-import librosa
-import os
-from pathlib import Path
-from typing import Tuple, List, Optional
-import logging
 
-from inference_utils import AudioProcessor
+from .inference_utils import AudioProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class GTZANDataset(Dataset):
     def __init__(
         self,
         data_dir: str,
+        cache_dir: str = "./preprocessed_cache",
         sr: int = 22050,
         n_mels: int = 128,
         n_fft: int = 2048,
@@ -23,9 +25,16 @@ class GTZANDataset(Dataset):
         duration: float = 30.0,
         segment_length: int = 130,
         augment: bool = True,
-        cache_spectrograms: bool = False,
+        preprocess_all: bool = True,
+        # cache_spectrograms: bool = False,
     ):
+        logger.info(f"Initializing GTZANDataset from {data_dir}")
+
         self.data_dir = Path(data_dir)
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(exist_ok=True)
+        logger.debug(f"Cache directory: {self.cache_dir}")
+
         self.sr = sr
         self.n_mels = n_mels
         self.n_fft = n_fft
@@ -33,9 +42,10 @@ class GTZANDataset(Dataset):
         self.duration = duration
         self.segment_length = segment_length
         self.augment = augment
-        self.cache_spectrograms = cache_spectrograms
+        # self.cache_spectrograms = cache_spectrograms
 
         # Discover genres and map to indices
+        logger.info("Discovering genres...")
         self.genres = sorted(
             [
                 d
@@ -43,12 +53,14 @@ class GTZANDataset(Dataset):
                 if os.path.isdir(os.path.join(self.data_dir, d))
             ]
         )
+        logger.info(f"Found genres: {self.genres}")
         self.genre_to_idx = {g: idx for idx, g in enumerate(self.genres)}
 
         self.audio_files = []
         self.labels = []
 
         # Load audio file paths and labels
+        logger.info("Loading audio file paths...")
         for genre in self.genres:
             genre_dir = self.data_dir / genre
             audio_paths = (
@@ -60,56 +72,110 @@ class GTZANDataset(Dataset):
             for audio_path in audio_paths:
                 self.audio_files.append(str(audio_path))
                 self.labels.append(self.genre_to_idx[genre])
+                logger.debug(f"Genre '{genre}': {len(self.audio_files)} files")
 
-            logger.info(
-                f"Loaded GTZAN dataset: {len(self.audio_files)} files, {len(self.genres)} genres"
+        logger.info(
+            f"Loaded GTZAN dataset: {len(self.audio_files)} files, {len(self.genres)} genres"
+        )
+
+        # Preprocess if requested
+        if preprocess_all:
+            self._preprocess_all()
+
+    def _preprocess_all(self):
+        metadata_file = self.cache_dir / "metadata.pkl"
+
+        if metadata_file.exists():
+            logger.info("Preprocessed cache found, skipping preprocessing")
+            return
+
+        logger.info("Preprocessing all audio files (this will take a few minutes)...")
+
+        try:
+            from tqdm import tqdm
+
+            use_tqdm = True
+        except ImportError:
+            logger.warning("tqdm not installed, progress bar disabled")
+            use_tqdm = False
+
+        iterator = (
+            tqdm(
+                enumerate(self.audio_files),
+                desc="Preprocessing",
+                total=len(self.audio_files),
             )
+            if use_tqdm
+            else enumerate(self.audio_files)
+        )
 
-        # Cache spectrograms if required
-        if cache_spectrograms:
-            self.spec_cache = {}
-        else:
-            self.spec_cache = None
+        for idx, audio_path in iterator:
+            cache_file = self.cache_dir / f"spec_{idx}.npy"
+
+            if not cache_file.exists():
+                try:
+                    mel_spec = self._extract_mel_spectrogram(audio_path)
+                    np.save(cache_file, mel_spec)
+                except Exception as e:
+                    logger.error(f"Error preprocessing {audio_path}: {e}")
+                    continue
+
+        # Save metadata
+        try:
+            with open(metadata_file, "wb") as f:
+                pickle.dump(
+                    {
+                        "genres": self.genres,
+                        "genre_to_idx": self.genre_to_idx,
+                        "num_files": len(self.audio_files),
+                        "labels": self.labels,
+                    },
+                    f,
+                )
+            logger.info(
+                f"Preprocessing complete!"
+                f"Cached {len(self.audio_files)} spectrograms"
+            )
+            logger.info(f"Cache size: ~{len(self.audio_files) * 0.2:.1f}MB")
+        except Exception as e:
+            logger.error(f"Error saving metadata: {e}")
+            raise
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         try:
-            audio_path = self.audio_files[index]
+            cache_file = self.cache_dir / f"spec_{index}.npy"
+            mel_spec = np.load(cache_file)
             label = self.labels[index]
 
-            mel_spectrogram = self._extract_mel_spectrogram(audio_path)
-
             if self.augment:
-                mel_spectrogram = self._augment_spectrogram(mel_spectrogram)
-                
-            spec_tensor = torch.FloatTensor(mel_spectrogram).unsqueeze(0)
+                mel_spec = self._augment_spectrogram(mel_spec)
 
+            # Convert to PyTorch tensors
+            spec_tensor = torch.FloatTensor(mel_spec).unsqueeze(0)
             label_tensor = torch.tensor(label, dtype=torch.long)
+
             return spec_tensor, label_tensor
-        except Exception as e:
-            logger.error(f"Error loading data at index {index}: {e}")
-            raise IndexError(f"Could not load sample at index: {index}")
+
+        except FileNotFoundError:
+            logger.error(f"Cache file not found for index {index}"
+                         f"Try setting preprocess_all=True or run preprocessing first")
+            raise
 
     def _extract_mel_spectrogram(self, audio_path: str) -> np.ndarray:
-        # Check cache
-        if self.spec_cache is not None and audio_path in self.spec_cache:
-            return self.spec_cache[audio_path]
-
-        # Use shared utility
-        mel_spec = AudioProcessor.extract_mel_spectrogram(
-            audio_path,
-            sr=self.sr,
-            n_mels=self.n_mels,
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            duration=self.duration,
-            segment_length=self.segment_length,
-        )
-
-        # Cache if enabled
-        if self.spec_cache is not None:
-            self.spec_cache[audio_path] = mel_spec
-
-        return mel_spec
+        try:
+            mel_spec = AudioProcessor.extract_mel_spectrogram(
+                audio_path,
+                sr=self.sr,
+                n_mels=self.n_mels,
+                n_fft=self.n_fft,
+                hop_length=self.hop_length,
+                duration=self.duration,
+                segment_length=self.segment_length,
+            )
+            return mel_spec
+        except Exception as e:
+            logger.error(f"Error extracting mel-spectrogram from {audio_path}: {e}")
+            raise
 
     def __len__(self):
         return len(self.audio_files)
@@ -143,7 +209,7 @@ class GTZANDataset(Dataset):
         return self.genres
 
     def get_dataset_info(self) -> dict:
-        genre_counts = {}
+        genre_counts: Dict[str, int] = {}
         for label in self.labels:
             genre = self.genres[label]
             genre_counts[genre] = genre_counts.get(genre, 0) + 1
@@ -155,8 +221,9 @@ class GTZANDataset(Dataset):
             "genre_distribution": genre_counts,
             "sample_rate": self.sr,
             "n_mels": self.n_mels,
+            "n_fft": self.n_fft,
             "duration_seconds": self.duration,
             "segment_length": self.segment_length,
             "augmentation": self.augment,
-            "caching": self.spec_cache is not None,
+            "caching": "preprocessed_cache",
         }

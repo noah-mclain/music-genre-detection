@@ -1,6 +1,7 @@
+from typing import Tuple, Union
+
 import torch
 import torch.nn as nn
-from typing import Union, Tuple
 
 
 class TemporalAttention(nn.Module):
@@ -59,7 +60,7 @@ class CNNLSTMAttentionModel(nn.Module):
         num_lstm_layers: int = 2,
         hidden_dim: int = 128,
         num_attention_heads: int = 4,
-        dropout: float = 0.2,
+        dropout: float = 0.3,
     ):
         super(CNNLSTMAttentionModel, self).__init__()
 
@@ -80,7 +81,7 @@ class CNNLSTMAttentionModel(nn.Module):
             nn.BatchNorm2d(64),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
-            # nn.Dropout2d(dropout),
+            nn.Dropout2d(dropout),
             # Block 3
             nn.Conv2d(64, 128, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1)),
             nn.BatchNorm2d(128),
@@ -92,7 +93,7 @@ class CNNLSTMAttentionModel(nn.Module):
             nn.BatchNorm2d(256),
             nn.ReLU(inplace=True),
             nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2)),
-            # nn.Dropout2d(dropout),
+            nn.Dropout2d(dropout),
         )
 
         self.cnn_output_dim = (
@@ -116,16 +117,6 @@ class CNNLSTMAttentionModel(nn.Module):
         )
         
         # Classification layer
-        # self.classifier = nn.Sequential(
-        #     nn.Linear(lstm_output_dim, hidden_dim),
-        #     nn.LeakyReLU(0.1, inplace=True),
-        #     # nn.Dropout(dropout),
-        #     nn.Linear(hidden_dim, hidden_dim // 2),
-        #     nn.LeakyReLU(0.1, inplace=True),
-        #     nn.Dropout(dropout),
-        #     nn.Linear(hidden_dim // 2, num_genres),
-        # )
-
         self.classifier = nn.Sequential(
             nn.LeakyReLU(0.1, inplace=True),
             nn.Dropout(dropout),

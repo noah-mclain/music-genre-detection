@@ -1,6 +1,11 @@
+import sys
+from pathlib import Path
+
 import pytest
 import torch
 import torch.nn as nn
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models import CNNLSTMAttentionModel, TemporalAttention
 
@@ -25,23 +30,23 @@ class TestTemporalAttention:
         assert context.shape == (batch_size, hidden_dim)
         assert weights.shape == (batch_size, 4, seq_len, seq_len)
 
-        def test_invalid_hidden_dim(self) -> None:
-            with pytest.raises(AssertionError):
-                TemporalAttention(hidden_dim=127, num_heads=4)
+    def test_invalid_hidden_dim(self) -> None:
+        with pytest.raises(AssertionError):
+            TemporalAttention(hidden_dim=127, num_heads=4)
 
-        def test_output_normalization(self) -> None:
-            batch_size = 2
-            seq_len = 10
-            hidden_dim = 128
+    def test_output_normalization(self) -> None:
+        batch_size = 2
+        seq_len = 10
+        hidden_dim = 128
 
-            lstm_output = torch.randn(batch_size, seq_len, hidden_dim)
-            attention = TemporalAttention(hidden_dim=hidden_dim, num_heads=4)
+        lstm_output = torch.randn(batch_size, seq_len, hidden_dim)
+        attention = TemporalAttention(hidden_dim=hidden_dim, num_heads=4)
 
-            _, weights = attention(lstm_output)
+        _, weights = attention(lstm_output)
 
-            # Sum of attention weights for each query should be ~1 for each query
-            weight_sum = weights.sum(dim=-1)
-            assert torch.allclose(weight_sum, torch.ones_like(weight_sum), atol=1e-6)
+        # Sum of attention weights for each query should be ~1 for each query
+        weight_sum = weights.sum(dim=-1)
+        assert torch.allclose(weight_sum, torch.ones_like(weight_sum), atol=1e-6)
 
 
 class TestCNNLSTMAttentionModel:
@@ -57,9 +62,7 @@ class TestCNNLSTMAttentionModel:
 
         assert logits.shape == (8, 10)
 
-    def test_model_forward_pass_with_attention(
-        self, sample_batch: torch.Tensor
-    ) -> None:
+    def test_model_forward_pass_with_attention(self, sample_batch: torch.Tensor) -> None:
         model = CNNLSTMAttentionModel(num_genres=10)
         logits, attn_weights = model(sample_batch, return_attention=True)
 
@@ -113,14 +116,14 @@ class TestCNNLSTMAttentionModel:
             model_cuda = model.to("cuda")
             sample_cuda = sample.to("cuda")
             logits_cuda = model_cuda(sample_cuda)
-            assert logits.device.type == "cuda"
+            assert logits_cuda.device.type == "cuda"
 
         # Test MPS (Apple Silicon) if available
         if torch.backends.mps.is_available():
             model_mps = model.to("mps")
             sample_mps = sample.to("mps")
             logits_mps = model_mps(sample_mps)
-            assert logits.device.type == "mps"
+            assert logits_mps.device.type == "mps"
 
 
 class TestModelOutputs:

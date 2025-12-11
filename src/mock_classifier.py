@@ -1,9 +1,9 @@
-import random
-import numpy as np
 import logging
+import random
 
-logger = logging.getLogger(__name__)
+import numpy as np
 
+logger = logging.getLogger(__name__) 
 
 class MockGenreClassifier:
     def __init__(

@@ -1,0 +1,12 @@
+[MASTER]
+ignore=tests,docs,__pycache__
+max-line-length=100
+disable=C0111, # Missing docstring
+C0103, # Invalid name
+W0212, # Access to a protected member
+R0913 # Too many arguments
+
+[DESIGN]
+max-locals=15
+max-branches=12
+max-statements=50

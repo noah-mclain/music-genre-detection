@@ -1,10 +1,12 @@
+import cv2
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.nn as nn
-import numpy as np
-import matplotlib.pyplot as plt
-import cv2
-from models import CNNLSTMAttentionModel
-from inference_utils import AudioProcessor
+
+from .inference_utils import AudioProcessor
+from .models import CNNLSTMAttentionModel
+
 
 class GradCAM:
     def __init__(self, model: nn.Module, target_layer: str):
@@ -36,6 +38,8 @@ class GradCAM:
         loss = output[0, class_idx]
         loss.backward()
 
+        if self.gradients is None:
+            raise RuntimeError("Gradients not captured. Ensure backward hook is registered correctly.")
         pooled_grads = torch.mean(self.gradients, dim=[0, 2, 3])
         cam = torch.zeros(self.activations.shape[2:], dtype=torch.float32)
 
@@ -48,7 +52,7 @@ class GradCAM:
         return cam
 
 
-def main():
+def run_gradcam():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Load model
@@ -84,4 +88,4 @@ def main():
     plt.show()
 
 if __name__ == "__main__":
-    main()
+    run_gradcam()

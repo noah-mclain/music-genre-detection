@@ -3,18 +3,16 @@ __author__ = "Omar Khaled, Nada Ayman"
 __license__ = "MIT"
 __description__ = "Music Genre Classification using CNN-LSTM-Attention"
 
+from .database import GTZANDataset
+from .GradCam import GradCAM
 from .inference_utils import (
-    AudioProcessor,
     AudioAugmentation,
+    AudioProcessor,
     GenreClassifier,
     audio_generator,
 )
-
 from .mock_classifier import MockGenreClassifier
-
-from .models import TemporalAttention, CNNLSTMAttentionModel
-
-from .database import GTZANDataset
+from .models import CNNLSTMAttentionModel, TemporalAttention
 
 __all__ = [
     # Audio Processing
@@ -29,6 +27,8 @@ __all__ = [
     "CNNLSTMAttentionModel",
     # Dataset
     "GTZANDataset",
+    # Grad-CAM
+    "GradCAM",
 ]
 
 import logging
