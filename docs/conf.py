@@ -1,3 +1,8 @@
+import os
+import sys
+sys.path.insert(0, os.path.abspath(".."))
+sys.path.insert(0, os.path.abspath("../src"))
+
 project = "music-genre-detection"
 copyright = "2025, Nada Ayman, Omar Khaled"
 author = "Nada Ayman, Omar Khaled"
@@ -8,7 +13,6 @@ extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.viewcode",
     "sphinx.ext.napoleon",
-    "sphinx_rtd_theme",
 ]
 
 templates_path = ["_templates"]
@@ -18,4 +22,4 @@ html_theme = "sphinx_rtd_theme"
 html_static_path = ["_static"]
 
 source_suffix = ".rst"
-master_doc = "index"
+root_doc = "index"
