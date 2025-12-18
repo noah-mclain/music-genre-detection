@@ -60,14 +60,6 @@ src.logging\_config module
    :show-inheritance:
    :undoc-members:
 
-src.main module
----------------
-
-.. automodule:: src.main
-   :members:
-   :show-inheritance:
-   :undoc-members:
-
 src.mock\_classifier module
 ---------------------------
 

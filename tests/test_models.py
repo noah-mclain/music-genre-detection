@@ -89,15 +89,16 @@ class TestCNNLSTMAttentionModel:
 
     def test_different_genre_counts(self, sample_batch: torch.Tensor) -> None:
         for num_genres in [5, 10, 20]:
-            model = CNNLSTMAttentionModel(num_genres=10)
+            model = CNNLSTMAttentionModel(num_genres=num_genres)
             optimizer = torch.optim.Adam(model.parameters())
 
             logits = model(sample_batch)
-            labels = torch.randint(0, 10, (8,))
-
+            labels = torch.randint(0, num_genres, (8,))
             loss_fn = nn.CrossEntropyLoss()
             loss = loss_fn(logits, labels)
             loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
 
             # Check that gradients are non-zero
             for param in model.parameters():

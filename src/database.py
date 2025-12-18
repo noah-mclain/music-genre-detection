@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from .inference_utils import AudioProcessor
+from .inference_utils import AudioAugmentationTemporal, AudioProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +17,7 @@ class GTZANDataset(Dataset):
     def __init__(
         self,
         data_dir: str,
-        cache_dir: str = "./preprocessed_cache",
+        cache_dir: str = "src/preprocessed_cache",
         sr: int = 22050,
         n_mels: int = 128,
         n_fft: int = 2048,
@@ -47,11 +47,7 @@ class GTZANDataset(Dataset):
         # Discover genres and map to indices
         logger.info("Discovering genres...")
         self.genres = sorted(
-            [
-                d
-                for d in os.listdir(self.data_dir)
-                if os.path.isdir(os.path.join(self.data_dir, d))
-            ]
+            [d for d in os.listdir(self.data_dir) if os.path.isdir(os.path.join(self.data_dir, d))]
         )
         logger.info(f"Found genres: {self.genres}")
         self.genre_to_idx = {g: idx for idx, g in enumerate(self.genres)}
@@ -84,13 +80,11 @@ class GTZANDataset(Dataset):
 
     def _preprocess_all(self):
         metadata_file = self.cache_dir / "metadata.pkl"
-
         if metadata_file.exists():
             logger.info("Preprocessed cache found, skipping preprocessing")
             return
 
         logger.info("Preprocessing all audio files (this will take a few minutes)...")
-
         try:
             from tqdm import tqdm
 
@@ -111,7 +105,6 @@ class GTZANDataset(Dataset):
 
         for idx, audio_path in iterator:
             cache_file = self.cache_dir / f"spec_{idx}.npy"
-
             if not cache_file.exists():
                 try:
                     mel_spec = self._extract_mel_spectrogram(audio_path)
@@ -120,7 +113,6 @@ class GTZANDataset(Dataset):
                     logger.error(f"Error preprocessing {audio_path}: {e}")
                     continue
 
-        # Save metadata
         try:
             with open(metadata_file, "wb") as f:
                 pickle.dump(
@@ -132,10 +124,7 @@ class GTZANDataset(Dataset):
                     },
                     f,
                 )
-            logger.info(
-                f"Preprocessing complete!"
-                f"Cached {len(self.audio_files)} spectrograms"
-            )
+            logger.info(f"Preprocessing complete! Cached {len(self.audio_files)} spectrograms")
             logger.info(f"Cache size: ~{len(self.audio_files) * 0.2:.1f}MB")
         except Exception as e:
             logger.error(f"Error saving metadata: {e}")
@@ -143,22 +132,48 @@ class GTZANDataset(Dataset):
 
     def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor]:
         try:
-            cache_file = self.cache_dir / f"spec_{index}.npy"
-            mel_spec = np.load(cache_file)
+            audio_path = self.audio_files[index]
             label = self.labels[index]
 
+            # If augmenting (TRAINING), load raw audio and apply temporal augmentation
             if self.augment:
+                # Load raw audio
+                y_audio = AudioProcessor.load_audio(
+                    audio_path, sr=self.sr, duration=self.duration, mono=True
+                )
+
+                # Apply TEMPORAL augmentation (time-stretch, pitch-shift, noise)
+                y_audio = AudioAugmentationTemporal.apply_random(y_audio, sr=self.sr)
+
+                # Extract spectrogram from augmented audio
+                mel_spec = AudioProcessor.extract_mel_spectrogram(
+                    y_audio=y_audio,  # Pass augmented audio
+                    sr=self.sr,
+                    n_mels=self.n_mels,
+                    n_fft=self.n_fft,
+                    hop_length=self.hop_length,
+                    duration=self.duration,
+                    segment_length=self.segment_length,
+                )
+                logging.debug(f"Applied temporal augmentation to {audio_path}")
+
+                # Also apply spectrogram-level augmentation (masking)
                 mel_spec = self._augment_spectrogram(mel_spec)
+
+            else:
+                # Validation: use cache (no augmentation needed)
+                cache_file = self.cache_dir / f"spec_{index}.npy"
+                mel_spec = np.load(cache_file)
+                logging.debug(f"Loaded cached spectrogram for {audio_path}")
 
             # Convert to PyTorch tensors
             spec_tensor = torch.FloatTensor(mel_spec).unsqueeze(0)
             label_tensor = torch.tensor(label, dtype=torch.long)
 
-            return spec_tensor, label_tensor
+            return spec_tensor, label_tensor.squeeze()
 
-        except FileNotFoundError:
-            logger.error(f"Cache file not found for index {index}"
-                         f"Try setting preprocess_all=True or run preprocessing first")
+        except Exception as e:
+            logger.error(f"Error in __getitem__: {e}")
             raise
 
     def _extract_mel_spectrogram(self, audio_path: str) -> np.ndarray:

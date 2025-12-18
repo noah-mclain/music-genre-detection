@@ -63,7 +63,7 @@ def run_gradcam():
     model.eval()
 
     # Load an example audio file
-    audio_path = "E:\Deep Learning\music-genre-detection\Data\genres_original\\reggae\\reggae.00014.wav"
+    audio_path = "src/Data/genres_original/reggae/reggae.00014.wav"
     mel_spec = AudioProcessor.extract_mel_spectrogram(audio_path)
     input_tensor = torch.tensor(mel_spec, dtype=torch.float32).unsqueeze(0).unsqueeze(0).to(device)
 

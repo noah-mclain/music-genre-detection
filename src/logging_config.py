@@ -15,8 +15,7 @@ LOGGING_CONFIG = {
         },
         "detailed": {
             "format": (
-                "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - "
-                "%(funcName)s(): %(message)s"
+                "%(asctime)s [%(levelname)s] %(name)s:%(lineno)d - " "%(funcName)s(): %(message)s"
             ),
             "datefmt": "%Y-%m-%d %H:%M:%S",
         },
@@ -44,6 +43,7 @@ LOGGING_CONFIG = {
             "filename": str(LOGS_DIR / "app.log"),
             "maxBytes": 10485760,  # 10MB
             "backupCount": 5,
+            "encoding": "utf-8",
         },
         "file_error": {
             "class": "logging.handlers.RotatingFileHandler",
@@ -52,6 +52,7 @@ LOGGING_CONFIG = {
             "filename": str(LOGS_DIR / "error.log"),
             "maxBytes": 10485760,  # 10MB
             "backupCount": 5,
+            "encoding": "utf-8",
         },
     },
     "loggers": {
@@ -61,7 +62,7 @@ LOGGING_CONFIG = {
         },
         "database": {
             "level": "DEBUG",
-            "handlers": ["console", "file"],
+            "handlers": ["console", "file", "file_error"],
             "propagate": False,
         },
         "inference_utils": {
@@ -82,9 +83,20 @@ LOGGING_CONFIG = {
     },
 }
 
+_logging_configured = False
+
 
 def setup_logging():
+    global _logging_configured
+    if _logging_configured:
+        return logging.getLogger(__name__)
+
+    # Ensure logs directory exists BEFORE configuring
+    LOGS_DIR.mkdir(exist_ok=True)
+
     logging.config.dictConfig(LOGGING_CONFIG)
+    _logging_configured = True
     logger = logging.getLogger(__name__)
     logger.info("Logging initialized")
+
     return logger

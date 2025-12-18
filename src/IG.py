@@ -71,7 +71,7 @@ def visualize_integrated_gradients(mel_spec, attributions, title=""):
 
 def run_integrated_gradients():
     logger.info("Loading dataset...")
-    dataset = GTZANDataset("E:\Deep Learning\music-genre-detection\Data\genres_original")
+    dataset = GTZANDataset("src/Data/genres_original")
     spec_tensor, label_tensor = dataset[AUDIO_INDEX]
 
     mel_np = spec_tensor.squeeze().numpy()

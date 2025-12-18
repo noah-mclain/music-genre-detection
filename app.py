@@ -1,5 +1,7 @@
+import atexit
 import logging
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -69,6 +71,7 @@ class MusicGenreClassifierApp:
         self._register_routes()
 
         self.app.config.from_object(config)
+        self.prediction_cache = {}
         CORS(self.app)
 
         # Create upload folder if it doesn't exist
@@ -158,6 +161,16 @@ class MusicGenreClassifierApp:
             secure_name = secure_filename(file.filename)
             temp_path = os.path.join(self.config.UPLOAD_FOLDER, f"temp_{secure_name}")
             file.save(temp_path)
+            
+            if secure_name in self.prediction_cache:
+                logger.info(f"Cache hit for {file.filename}")
+                cached_result = self.prediction_cache[secure_name]
+                return jsonify({
+                    "success" : True,
+                    "filename" : file.filename,
+                    **cached_result
+                }), 200
+
 
             try:
                 # Extract features and predict
@@ -193,9 +206,16 @@ class MusicGenreClassifierApp:
                 sorted_predictions = dict(
                     sorted(all_predictions.items(), key=lambda x: x[1], reverse=True)
                 )
+                result = {
+                    "genre": self.config.GENRE_MAPPING[pred_idx],
+                    "confidence" : confidence,
+                    "predictions" : sorted_predictions
+                }
+                self.prediction_cache[file.filename] = result
+
 
                 logger.info(
-                    f"✅ Prediction: {self.config.GENRE_MAPPING[pred_idx]} ({confidence:.2f}%)"
+                    f"Prediction: {self.config.GENRE_MAPPING[pred_idx]} ({confidence:.2f}%)"
                 )
 
                 return (
@@ -203,9 +223,7 @@ class MusicGenreClassifierApp:
                         {
                             "success": True,
                             "filename": secure_name,
-                            "genre": self.config.GENRE_MAPPING[pred_idx],
-                            "confidence": confidence,
-                            "predictions": sorted_predictions,
+                            **result
                         }
                     ),
                     200,
@@ -270,7 +288,7 @@ class MusicGenreClassifierApp:
                         #         "predictions": sorted_predictions,
                         #     }
                         # )
-                        # logger.info(f"✅ {filename}: {genre}")
+                        # logger.info(f"{filename}: {genre}")
 
                         # ============================================
                         # PRODUCTION VERSION
@@ -318,7 +336,7 @@ class MusicGenreClassifierApp:
                                 "predictions": sorted_predictions,
                             }
                         )
-                        logger.info(f"✅ {filename}: {self.config.GENRE_MAPPING[pred_idx]}")
+                        logger.info(f"{filename}: {self.config.GENRE_MAPPING[pred_idx]}")
 
                     except Exception as e:
                         logger.error(f"Error processing {filename}: {e}")
@@ -330,7 +348,7 @@ class MusicGenreClassifierApp:
                             }
                         )
 
-            logger.info(f"✅ Processed {len(results)} files")
+            logger.info(f"Processed {len(results)} files")
             return jsonify({"results": results}), 200
 
         except Exception as e:
@@ -358,7 +376,14 @@ def create_app(config=None):
         config = Config()
     return MusicGenreClassifierApp(config)
 
+def cleanup_uploaded_files(folder):
+    if os.path.exists(folder):
+        logger.info(f"Cleaning up uploaded files in {folder}....")
+        shutil.rmtree(folder)
+
 
 if __name__ == "__main__":
     app = create_app()
+    atexit.register(cleanup_uploaded_files, app.config.UPLOAD_FOLDER)
     app.run()
+    

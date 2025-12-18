@@ -23,9 +23,7 @@ class AudioProcessor:
             # Pad to fixed length
             expected_samples = int(sr * duration)
             if len(y_audio) < expected_samples:
-                y_audio = np.pad(
-                    y_audio, (0, expected_samples - len(y_audio)), mode="constant"
-                )
+                y_audio = np.pad(y_audio, (0, expected_samples - len(y_audio)), mode="constant")
             else:
                 y_audio = y_audio[:expected_samples]
 
@@ -36,7 +34,8 @@ class AudioProcessor:
 
     @staticmethod
     def extract_mel_spectrogram(
-        audio_path: str,
+        audio_path: str = None,
+        y_audio: np.ndarray = None,
         sr: int = 22050,
         n_mels: int = 128,
         n_fft: int = 2048,
@@ -46,9 +45,8 @@ class AudioProcessor:
         normalize: bool = True,
     ) -> np.ndarray:
         try:
-            y_audio = AudioProcessor.load_audio(
-                audio_path, sr=sr, duration=duration, mono=True
-            )
+            if y_audio is None:
+                y_audio = AudioProcessor.load_audio(audio_path, sr=sr, duration=duration, mono=True)
 
             # mfccs = librosa.feature.mfcc(y=y_audio, sr=sr, n_mfcc=20)
             spectrogram = librosa.feature.melspectrogram(
@@ -59,9 +57,9 @@ class AudioProcessor:
             spectrogram_log_scale = librosa.power_to_db(spectrogram, ref=np.max)
 
             if normalize:
-                spectrogram_log_scale = (
-                    spectrogram_log_scale - spectrogram_log_scale.mean()
-                ) / (spectrogram_log_scale.std() + 1e-8)
+                spectrogram_log_scale = (spectrogram_log_scale - spectrogram_log_scale.mean()) / (
+                    spectrogram_log_scale.std() + 1e-8
+                )
 
             # Pad to fixed length
             current_width = spectrogram_log_scale.shape[1]
@@ -117,23 +115,59 @@ class AudioAugmentation:
 
         if np.random.rand() < 0.33:
             augmentations.append(
-                AudioAugmentation.pitch_shift(
-                    y_audio, sr, steps=np.random.randint(-2, 3)
-                )
+                AudioAugmentation.pitch_shift(y_audio, sr, steps=np.random.randint(-2, 3))
             )
         if np.random.rand() < 0.33:
             augmentations.append(
-                AudioAugmentation.time_stretch(
-                    y_audio, rate=np.random.uniform(0.9, 1.1)
-                )
+                AudioAugmentation.time_stretch(y_audio, rate=np.random.uniform(0.9, 1.1))
             )
         if np.random.rand() < 0.33:
-            augmentations.append(
-                AudioAugmentation.add_noise(y_audio, noise_factor=0.005)
-            )
+            augmentations.append(AudioAugmentation.add_noise(y_audio, noise_factor=0.005))
         if augmentations:
             return augmentations[0]
         return y_audio
+
+
+class AudioAugmentationTemporal:
+    @staticmethod
+    def time_stretch(y_audio: np.ndarray, sr: int = 22050) -> np.ndarray:
+        rate = np.random.uniform(0.8, 1.2)
+        try:
+            return librosa.effects.time_stretch(y_audio, rate=rate)
+        except:
+            return y_audio
+
+    @staticmethod
+    def pitch_shift(y_audio: np.ndarray, sr: int = 22050) -> np.ndarray:
+        n_steps = np.random.randint(-4, 5)
+        try:
+            return librosa.effects.pitch_shift(y_audio, sr=sr, n_steps=n_steps)
+        except:
+            return y_audio
+
+    @staticmethod
+    def add_noise(y_audio: np.ndarray, snr_db: float = 20) -> np.ndarray:
+        signal_power = np.mean(y_audio**2)
+        noise_power = signal_power / (10 ** (snr_db / 10))
+        noise = np.random.normal(0, np.sqrt(noise_power), len(y_audio))
+        return y_audio + noise
+
+    @staticmethod
+    def apply_random(y_audio: np.ndarray, sr: int = 22050) -> np.ndarray:
+        augs = [
+            lambda: AudioAugmentationTemporal.time_stretch(y_audio, sr),
+            lambda: AudioAugmentationTemporal.pitch_shift(y_audio, sr),
+            lambda: AudioAugmentationTemporal.add_noise(y_audio),
+        ]
+        n_apply = np.random.randint(2, 5)
+        selected = np.random.choice(len(augs), n_apply, replace=True)
+        result = y_audio.copy()
+        for idx in selected:
+            try:
+                result = augs[idx]()
+            except:
+                pass
+        return result
 
 
 class GenreClassifier:
