@@ -138,12 +138,12 @@ Upload an audio file and the model will predict its genre with confidence scores
 The CNN-LSTM-Attention model consists of:
 
 1. **CNN Feature Extractor**
-   - 4 convolutional blocks with batch normalization and ReLU activation
+   - 3 convolutional blocks with batch normalization and ReLU activation
    - Max pooling and dropout for regularization
    - Processes mel-spectrograms (128 mel-bins × 130 time steps)
 
 2. **LSTM Layers**
-   - 2 bidirectional LSTM layers with configurable hidden dimension
+   - 1 LSTM layer with configurable hidden dimension
    - Captures temporal dependencies in the spectrogram from both directions
 
 3. **Attention Mechanism**
